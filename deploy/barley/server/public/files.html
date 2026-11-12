@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FilmCraft · pliki</title>
+  <link rel="icon" href="/assets/icon.png" type="image/png">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><img src="/assets/icon.png" alt=""><span>FilmCraft</span></div>
+    <div class="spacer"></div>
+    <span id="me" class="muted"></span>
+    <button id="account-btn" type="button">Konto</button>
+    <button id="logout-btn" class="ghost" type="button">Wyloguj</button>
+  </header>
+
+  <main class="files">
+    <div class="toolbar">
+      <nav class="crumbs" id="crumbs" aria-label="Ścieżka"></nav>
+      <button id="new-project" class="primary" type="button">Nowy projekt</button>
+      <button id="new-folder" type="button">Nowy folder</button>
+      <button id="upload-btn" type="button">Prześlij pliki</button>
+      <input id="upload-input" type="file" multiple hidden>
+    </div>
+    <table class="list">
+      <thead><tr><th>Nazwa</th><th class="col-size">Rozmiar</th><th class="col-date">Zmieniono</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="empty" class="empty hidden">Ten folder jest pusty. Przeciągnij tu pliki albo utwórz projekt.</div>
+  </main>
+
+  <div id="drop" class="drop hidden">Upuść pliki, aby przesłać je do tego folderu</div>
+
+  <dialog id="account">
+    <h2>Konto</h2>
+    <h3>Twoje passkeys</h3>
+    <div id="passkeys"></div>
+    <div class="actions"><button id="add-passkey" type="button">Dodaj passkey (nowe urządzenie)</button></div>
+    <div id="admin" class="hidden">
+      <h3>Osoby z dostępem</h3>
+      <div id="users"></div>
+      <h3>Zaproszenia</h3>
+      <div id="invites"></div>
+      <div class="actions"><button id="new-invite" class="primary" type="button">Utwórz link z zaproszeniem</button></div>
+      <div id="invite-out" class="hidden"><span class="muted">Link jednorazowy, ważny 24 h:</span><code id="invite-url"></code></div>
+    </div>
+    <div class="actions"><button id="account-close" type="button">Zamknij</button></div>
+  </dialog>
+
+  <script src="/assets/webauthn.js"></script>
+  <script type="module" src="/assets/files.js"></script>
+</body>
+</html>

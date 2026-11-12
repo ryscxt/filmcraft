@@ -13,6 +13,8 @@
 //! await filmcraft.importUrl("/clip.mp4")                   // fetch + import (tests)
 //! await filmcraft.importFiles(input.files)                 // File / FileList / File[]
 //! await filmcraft.openProject(file)                        // .fcproj File or URL
+//! filmcraft.mountUrl("/api/files/raw/a.mp4", "/files/a.mp4", size)  // server file, Range reads
+//! await filmcraft.importMounted(["/files/a.mp4"])         // import mounted files
 //! filmcraft.files(); await filmcraft.readFile("/exports/a.mp4"); filmcraft.info()
 //! ```
 //!
@@ -188,6 +190,31 @@ pub fn install() -> Result<(), JsValue> {
                 let f = fetch_file(&url, name.as_string()).await?;
                 Ok(to_js(&crate::import::import_files(vec![f]).await))
             }))
+        })
+        .into_js_value(),
+    )?;
+    set_fn(
+        &obj,
+        "mountUrl",
+        Closure::<dyn Fn(String, String, f64) -> Result<JsValue, JsValue>>::new(|url: String, path: String, size: f64| {
+            // A size must be a whole, non-negative number of bytes (a NaN or negative would wrap).
+            if !(size.is_finite() && size >= 0.0 && size.fract() == 0.0 && size <= u64::MAX as f64) {
+                return Err(as_error(format!("{size}: not a file size").into()));
+            }
+            crate::fs::register_url(&path, &url, size as u64).map(JsValue::from).map_err(|e| as_error(e.into()))
+        })
+        .into_js_value(),
+    )?;
+    set_fn(
+        &obj,
+        "importMounted",
+        Closure::<dyn Fn(JsValue) -> js_sys::Promise>::new(|paths: JsValue| {
+            let paths: Vec<String> = if js_sys::Array::is_array(&paths) {
+                js_sys::Array::from(&paths).iter().filter_map(|p| p.as_string()).collect()
+            } else {
+                paths.as_string().into_iter().collect()
+            };
+            future_to_promise(async move { Ok(to_js(&crate::import::import_mounted(paths).await)) })
         })
         .into_js_value(),
     )?;

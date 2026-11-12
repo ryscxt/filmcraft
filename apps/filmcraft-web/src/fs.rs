@@ -7,6 +7,9 @@
 //!   A read whose chunks are not cached yet starts the fetch (plus read-ahead) and fails with
 //!   `WouldBlock`, marking [`filmcraft_media::pending`]: the frame server and imports retry once
 //!   the bytes have arrived (the repaint hook wakes the UI).
+//! - Media on the page's own server can be mounted by URL ([`register_url`]): the same chunk
+//!   cache, filled with HTTP `Range` requests (`fetch`, same-origin credentials), so a host that
+//!   keeps media on its server never downloads a file whole.
 //! - Files the app writes (saved projects, exports, captions) are kept in memory under their
 //!   path and offered as a browser download; paths under `/opfs/` are written to the Origin
 //!   Private File System instead (auto-save / crash recovery).
@@ -31,6 +34,25 @@ pub const CACHE_BUDGET: usize = 384 << 20;
 /// Largest Blob `read_file` will load whole (captions, interchange documents, projects).
 const WHOLE_FILE_MAX: u64 = 256 << 20;
 
+/// Where a registered file's bytes come from.
+enum Source {
+    Blob(web_sys::Blob),
+    /// A same-origin URL read with `Range` requests; `size` is what the host said the file holds.
+    Url {
+        url: String,
+        size: u64,
+    },
+}
+
+impl Source {
+    fn size(&self) -> u64 {
+        match self {
+            Source::Blob(b) => b.size() as u64,
+            Source::Url { size, .. } => *size,
+        }
+    }
+}
+
 enum Entry {
     Blob { id: u32, size: u64 },
     Mem(Arc<[u8]>),
@@ -39,7 +61,7 @@ enum Entry {
 #[derive(Default)]
 struct Fs {
     entries: HashMap<String, Entry>,
-    blobs: HashMap<u32, web_sys::Blob>,
+    blobs: HashMap<u32, Source>,
     next_id: u32,
     chunks: HashMap<(u32, u64), (Arc<[u8]>, u64)>,
     bytes: usize,
@@ -92,10 +114,36 @@ pub fn register_blob(name: &str, blob: web_sys::Blob) -> String {
         };
         let id = fs.next_id;
         fs.next_id += 1;
-        fs.blobs.insert(id, blob);
+        fs.blobs.insert(id, Source::Blob(blob));
         fs.entries.insert(path.clone(), Entry::Blob { id, size });
         fs.recount();
         path
+    })
+}
+
+/// Mount a file on the page's server at the virtual `path` (under `/files/`), read on demand with
+/// HTTP `Range` requests to `url`. The host gives the size (from its own file listing), so nothing
+/// is fetched until a read needs it. Mounting a path again replaces its source (a page reload
+/// re-mounts the same paths a saved project refers to). Returns the path, or why it was refused.
+pub fn register_url(path: &str, url: &str, size: u64) -> Result<String, String> {
+    crate::mountpath::url_path_ok(path)?;
+    if url.is_empty() {
+        return Err("empty URL".into());
+    }
+    FS.with(|fs| {
+        let mut fs = fs.borrow_mut();
+        if let Some(Entry::Blob { id: old, .. }) = fs.entries.get(path) {
+            let old = *old;
+            fs.blobs.remove(&old);
+            fs.chunks.retain(|(id, _), _| *id != old);
+            fs.failed.retain(|(id, _), _| *id != old);
+        }
+        let id = fs.next_id;
+        fs.next_id = fs.next_id.checked_add(1).ok_or("too many files")?;
+        fs.blobs.insert(id, Source::Url { url: url.to_string(), size });
+        fs.entries.insert(path.to_string(), Entry::Blob { id, size });
+        fs.recount();
+        Ok(path.to_string())
     })
 }
 
@@ -136,7 +184,11 @@ pub fn blob(path: &str) -> Option<web_sys::Blob> {
     FS.with(|fs| {
         let fs = fs.borrow();
         match fs.entries.get(path)? {
-            Entry::Blob { id, .. } => fs.blobs.get(id).cloned(),
+            Entry::Blob { id, .. } => match fs.blobs.get(id)? {
+                Source::Blob(b) => Some(b.clone()),
+                // A mounted URL has no Blob: the host serves the file itself.
+                Source::Url { .. } => None,
+            },
             Entry::Mem(b) => bytes_to_blob(b, "application/octet-stream").ok(),
         }
     })
@@ -214,24 +266,30 @@ impl Fs {
 
 /// Start fetching chunk `c` of blob `id` unless it is cached or already on its way.
 fn request(id: u32, c: u64) {
-    let blob = FS.with(|fs| {
+    let source = FS.with(|fs| {
         let mut fs = fs.borrow_mut();
         if fs.chunks.contains_key(&(id, c)) || fs.inflight.contains(&(id, c)) {
             return None;
         }
-        let blob = fs.blobs.get(&id)?.clone();
+        let source = match fs.blobs.get(&id)? {
+            Source::Blob(b) => Source::Blob(b.clone()),
+            Source::Url { url, size } => Source::Url { url: url.clone(), size: *size },
+        };
         fs.failed.remove(&(id, c));
         fs.inflight.insert((id, c));
-        Some(blob)
+        Some(source)
     });
-    let Some(blob) = blob else { return };
-    let size = blob.size() as u64;
-    let (a, b) = (c * CHUNK, ((c + 1) * CHUNK).min(size));
-    let fut = blob.slice_with_f64_and_f64(a as f64, b as f64).map(|s| JsFuture::from(s.array_buffer()));
+    let Some(source) = source else { return };
+    let size = source.size();
+    let a = c.saturating_mul(CHUNK).min(size);
+    let b = c.saturating_add(1).saturating_mul(CHUNK).min(size);
     wasm_bindgen_futures::spawn_local(async move {
-        let r = match fut {
-            Ok(f) => f.await.map(|buf| js_sys::Uint8Array::new(&buf).to_vec()),
-            Err(e) => Err(e),
+        let r = match source {
+            Source::Blob(blob) => match blob.slice_with_f64_and_f64(a as f64, b as f64).map(|s| JsFuture::from(s.array_buffer())) {
+                Ok(f) => f.await.map(|buf| js_sys::Uint8Array::new(&buf).to_vec()),
+                Err(e) => Err(e),
+            },
+            Source::Url { url, .. } => fetch_range(&url, a, b).await,
         };
         let wake = FS.with(|fs| {
             let mut fs = fs.borrow_mut();
@@ -257,6 +315,36 @@ fn request(id: u32, c: u64) {
             w();
         }
     });
+}
+
+/// `[a, b)` of a same-origin URL, with a `Range` request. A `206` must hold exactly the range; a
+/// server that ignores `Range` and answers `200` with the whole file is accepted only for the
+/// first chunk of a file that small, so a large file is never pulled whole by accident.
+async fn fetch_range(url: &str, a: u64, b: u64) -> Result<Vec<u8>, wasm_bindgen::JsValue> {
+    if b <= a {
+        return Ok(Vec::new());
+    }
+    let w = web_sys::window().ok_or("no window")?;
+    let headers = web_sys::Headers::new()?;
+    headers.set("Range", &format!("bytes={a}-{}", b - 1))?;
+    let init = web_sys::RequestInit::new();
+    init.set_method("GET");
+    init.set_headers(&headers);
+    init.set_credentials(web_sys::RequestCredentials::SameOrigin);
+    let resp: web_sys::Response = JsFuture::from(w.fetch_with_str_and_init(url, &init)).await?.dyn_into()?;
+    let want = usize::try_from(b - a).map_err(|_| "range too large")?;
+    match resp.status() {
+        206 => {}
+        200 if a == 0 && b <= CHUNK => {}
+        s => return Err(format!("{url}: HTTP {s} for bytes {a}-{}", b - 1).into()),
+    }
+    let buf = JsFuture::from(resp.array_buffer()?).await?;
+    let mut v = js_sys::Uint8Array::new(&buf).to_vec();
+    if v.len() < want {
+        return Err(format!("{url}: short read ({} of {want} bytes)", v.len()).into());
+    }
+    v.truncate(want);
+    Ok(v)
 }
 
 /// Random-access reads of a registered Blob through the chunk cache.

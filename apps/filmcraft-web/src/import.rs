@@ -132,6 +132,40 @@ pub async fn import_files(files: Vec<web_sys::File>) -> Value {
     json!({"items": items, "errors": errors, "paths": paths})
 }
 
+/// Import files a host already mounted from its server ([`fs::register_url`]) into the current
+/// bin: the container index prefetched with `Range` reads, then `file.import`, as for a dropped
+/// file. Returns `{items, errors, paths}` like [`import_files`]. Mounted media is not copied for
+/// crash recovery: it lives on the host's server.
+pub async fn import_mounted(paths: Vec<String>) -> Value {
+    let bin = on_ui(|w, _| w.app.import_bin().0).await;
+    let mut items = Vec::new();
+    let mut errors = Vec::new();
+    let mut done = Vec::new();
+    for path in paths {
+        let size = match fs::WebServices.file_size(&path) {
+            Ok(n) => n,
+            Err(e) => {
+                errors.push(json!(e.to_string()));
+                continue;
+            }
+        };
+        prewarm(&path, size).await;
+        match import_path(path.clone(), bin).await {
+            Ok(v) => {
+                items.extend(v.get("items").and_then(Value::as_array).cloned().unwrap_or_default());
+                errors.extend(v.get("errors").and_then(Value::as_array).cloned().unwrap_or_default());
+            }
+            Err(e) => errors.push(json!(e)),
+        }
+        done.push(json!(path));
+    }
+    if !errors.is_empty() {
+        let msg = errors.iter().filter_map(Value::as_str).collect::<Vec<_>>().join("; ");
+        crate::post(move |w, _| w.app.status(msg));
+    }
+    json!({"items": items, "errors": errors, "paths": done})
+}
+
 /// Open a `.fcproj` file picked or dropped by the user.
 pub async fn open_project_file(file: web_sys::File) -> Result<Value, String> {
     let buf = JsFuture::from(file.array_buffer()).await.map_err(|e| format!("{e:?}"))?;

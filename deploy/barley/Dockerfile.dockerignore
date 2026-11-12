@@ -1,0 +1,7 @@
+# Docker reads this file for deploy/barley/Dockerfile (BuildKit: <Dockerfile>.dockerignore)
+target
+**/node_modules
+.git
+plan
+deploy/barley/server/test
+*.fcproj

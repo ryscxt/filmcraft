@@ -566,14 +566,21 @@ impl<P: Pixel> Core<P> {
         let pps_nal = nal::nal(3, NAL_PPS, &pps.rbsp());
         let threads = if cfg.threads == 0 { std::thread::available_parallelism().map_or(1, |n| n.get()) } else { cfg.threads };
         let slices = if cfg.slices > 0 { cfg.slices.min(mbh) } else { threads.min(mbh.div_ceil(4)).max(1) };
+        // Natively a pool is built for every thread count, also 1 (see `Pool`). On wasm32 there are
+        // no threads to spawn (the browser build has no atomics), so building one fails and the
+        // export with it; one thread encodes inline there, where rayon runs everything inline anyway.
         #[cfg(feature = "threads")]
         let pool = Pool {
-            pool: Some(
-                rayon::ThreadPoolBuilder::new()
-                    .num_threads(threads)
-                    .build()
-                    .map_err(|e| Error::InvalidConfig(format!("cannot build the {threads}-thread pool: {e}")))?,
-            ),
+            pool: if threads > 1 || !cfg!(target_arch = "wasm32") {
+                Some(
+                    rayon::ThreadPoolBuilder::new()
+                        .num_threads(threads)
+                        .build()
+                        .map_err(|e| Error::InvalidConfig(format!("cannot build the {threads}-thread pool: {e}")))?,
+                )
+            } else {
+                None
+            },
         };
         #[cfg(not(feature = "threads"))]
         let pool = Pool {};

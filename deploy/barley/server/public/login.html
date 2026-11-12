@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FilmCraft · logowanie</title>
+  <link rel="icon" href="/assets/icon.png" type="image/png">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <main class="auth">
+    <div class="card">
+      <div class="brand"><img src="/assets/icon.png" alt=""><strong>FilmCraft</strong></div>
+
+      <section id="login" class="hidden">
+        <h1>Zaloguj się</h1>
+        <p class="lead">Użyj passkeya zapisanego na tym urządzeniu, telefonie lub kluczu sprzętowym.</p>
+        <button id="login-btn" class="primary" type="button">Zaloguj passkeyem</button>
+      </section>
+
+      <section id="setup" class="hidden">
+        <h1>Pierwsze uruchomienie</h1>
+        <p class="lead">Utwórz konto administratora i zarejestruj swój passkey.</p>
+        <form id="setup-form">
+          <label for="setup-token">Token konfiguracji (SETUP_TOKEN)</label>
+          <input id="setup-token" type="password" autocomplete="off" required>
+          <label for="setup-name">Imię</label>
+          <input id="setup-name" type="text" autocomplete="name" maxlength="60" required>
+          <button class="primary" type="submit">Utwórz passkey</button>
+        </form>
+      </section>
+
+      <section id="invite" class="hidden">
+        <h1>Zaproszenie do FilmCraft</h1>
+        <p class="lead" id="invite-lead">Podaj imię i zarejestruj passkey, aby dołączyć.</p>
+        <form id="invite-form">
+          <label for="invite-name">Imię</label>
+          <input id="invite-name" type="text" autocomplete="name" maxlength="60" required>
+          <button class="primary" type="submit">Utwórz passkey</button>
+        </form>
+      </section>
+
+      <div id="msg" class="msg muted" role="status" aria-live="polite"></div>
+    </div>
+  </main>
+  <script src="/assets/webauthn.js"></script>
+  <script type="module" src="/assets/login.js"></script>
+</body>
+</html>

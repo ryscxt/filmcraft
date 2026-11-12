@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>FilmCraft</title>
+  <link rel="icon" href="/assets/icon.png" type="image/png">
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/edit-guard.js"></script>
+</head>
+<body class="editor">
+  <header class="top">
+    <button id="back" class="ghost" type="button">← Pliki</button>
+    <span id="dot" class="status-dot" title="Zapisano"></span>
+    <span id="doc" class="doc"></span>
+    <div class="spacer"></div>
+    <span id="lock" class="badge hidden"></span>
+    <button id="add-media" type="button" title="Prześlij pliki z dysku do folderu projektu i zaimportuj je">Prześlij media</button>
+    <button id="refresh" class="ghost" type="button" title="Podłącz pliki, które pojawiły się na serwerze">Odśwież pliki</button>
+    <input id="media-input" type="file" multiple hidden>
+  </header>
+  <div class="stage">
+    <canvas id="filmcraft_canvas" data-host="page" tabindex="0"></canvas>
+    <div id="loading"><img src="/assets/icon.png" alt=""><div id="status">Ładowanie FilmCraft…</div></div>
+    <div id="fatal" role="alertdialog" aria-labelledby="fatal-title">
+      <div class="box">
+        <h1 id="fatal-title">FilmCraft przestał działać</h1>
+        <div>Niezapisane zmiany od ostatniego zapisu na serwerze mogły przepaść.</div>
+        <pre id="fatal-msg"></pre>
+        <button id="fatal-reload" type="button">Przeładuj</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/assets/edit.js"></script>
+</body>
+</html>

@@ -25,6 +25,7 @@ pub mod fs;
 pub mod host;
 pub mod hostmode;
 pub mod import;
+pub mod mountpath;
 pub mod opfs;
 pub mod recovery;
 pub mod recovery_policy;

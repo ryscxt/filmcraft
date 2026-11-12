@@ -1,0 +1,17 @@
+# Local run (or a compose app in Deplo): docker compose -f deploy/barley/compose.yaml up --build
+services:
+  filmcraft:
+    build:
+      context: ../..
+      dockerfile: deploy/barley/Dockerfile
+    environment:
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      RP_ID: ${RP_ID:-localhost}
+      SETUP_TOKEN: ${SETUP_TOKEN:?set SETUP_TOKEN to create the first admin}
+    ports:
+      - "3000:3000"
+    volumes:
+      - filmcraft-data:/data
+    restart: unless-stopped
+volumes:
+  filmcraft-data:

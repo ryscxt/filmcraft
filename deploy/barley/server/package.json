@@ -1,0 +1,22 @@
+{
+  "name": "filmcraft-barley",
+  "private": true,
+  "version": "0.1.0",
+  "description": "FilmCraft web host for Barley: passkey sign-in and shared server-side files",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "node src/main.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@simplewebauthn/browser": "13.2.2",
+    "@simplewebauthn/server": "13.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  }
+}

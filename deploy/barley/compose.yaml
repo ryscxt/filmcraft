@@ -3,7 +3,7 @@ services:
   filmcraft:
     build:
       context: ../..
-      dockerfile: deploy/barley/Dockerfile
+      dockerfile: Dockerfile
     environment:
       ORIGIN: ${ORIGIN:-http://localhost:3000}
       RP_ID: ${RP_ID:-localhost}

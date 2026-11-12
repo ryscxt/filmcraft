@@ -1,0 +1,7 @@
+# Docker (BuildKit) reads this for ./Dockerfile; the repository root has no .dockerignore of its own
+target
+**/node_modules
+.git
+plan
+deploy/barley/server/test
+*.fcproj

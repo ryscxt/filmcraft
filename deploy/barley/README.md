@@ -66,7 +66,8 @@ SETUP_TOKEN=dev DATA_DIR=/tmp/fc-data npm start   # http://localhost:3000/setup#
 npm test                                          # testy serwera z programowym passkeyem
 ```
 
-albo cały obraz: `SETUP_TOKEN=dev docker compose -f deploy/barley/compose.yaml up --build`.
+albo cały obraz: `SETUP_TOKEN=dev docker compose -f deploy/barley/compose.yaml up --build`
+(Dockerfile leży w katalogu głównym repozytorium).
 
 ## Aktualizacja FilmCraft z upstreamu
 
@@ -76,8 +77,9 @@ git rebase upstream/main        # na gałęzi barley
 git push --force-with-lease origin barley
 ```
 
-Zmiany poza `deploy/barley/` są małe: `apps/filmcraft-web/src/{fs,api,import,mountpath}.rs`
-(montowanie plików po URL) i ich test. Po rebase sprawdź `cargo test -p filmcraft-web` i
+Zmiany poza `deploy/barley/` (i `Dockerfile` + `Dockerfile.dockerignore` w katalogu głównym — Deplo buduje z `./Dockerfile`) są małe: `apps/filmcraft-web/src/{fs,api,import,mountpath}.rs`
+(montowanie plików po URL) z testem oraz `crates/h264enc/src/lib.rs` (eksport H.264 w przeglądarce
+nie buduje puli wątków — bez tego eksport się wywracał). Po rebase sprawdź `cargo test -p filmcraft-web` i
 `cargo check -p filmcraft-web --target wasm32-unknown-unknown`.
 
 ## Ograniczenia

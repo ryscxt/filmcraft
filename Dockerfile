@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # FilmCraft for Barley: the FilmCraft web build behind a passkey sign-in, editing projects and
 # media kept in a shared folder on the server. Build from the repository root:
-#   docker build -f deploy/barley/Dockerfile -t filmcraft-barley .
+#   docker build -t filmcraft-barley .   (deploy/barley/README.md)
 
 # 1. FilmCraft's web build (wasm32 + wasm-bindgen + wasm-opt), as `cargo xtask web` makes it
 FROM rust:1.95-bookworm AS wasm
